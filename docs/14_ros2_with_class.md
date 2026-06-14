@@ -399,4 +399,103 @@ int main(int argc, char * argv[])
 
 ---
 
+## パラメータ動的変更のクラス版
+
+8章では**ラムダ**で `add_on_set_parameters_callback` を登録しました．クラスを使うと，コールバックを**メンバ関数**として書けるため，メンバ変数への反映も自然に書けます．
+
+```cpp
+#include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/string.hpp"
+#include "rcl_interfaces/msg/set_parameters_result.hpp"
+
+class ParamNode : public rclcpp::Node
+{
+public:
+    ParamNode() : Node("param_node")
+    {
+        this->declare_parameter("robot_name",   std::string("robot_A"));
+        this->declare_parameter("publish_rate", 2);
+
+        robot_name_   = this->get_parameter("robot_name").as_string();
+        publish_rate_ = this->get_parameter("publish_rate").as_int();
+
+        // メンバ関数をコールバックとして登録
+        cb_handle_ = this->add_on_set_parameters_callback(
+            std::bind(&ParamNode::on_set_parameters, this, std::placeholders::_1));
+
+        pub_   = this->create_publisher<std_msgs::msg::String>("status", 10);
+        timer_ = this->create_wall_timer(
+            std::chrono::milliseconds(1000 / publish_rate_),
+            std::bind(&ParamNode::timer_callback, this));
+
+        RCLCPP_INFO(this->get_logger(), "ParamNode 起動");
+    }
+
+private:
+    rcl_interfaces::msg::SetParametersResult
+    on_set_parameters(const std::vector<rclcpp::Parameter> & params)
+    {
+        rcl_interfaces::msg::SetParametersResult result;
+        result.successful = true;
+
+        for (const auto & p : params) {
+            if (p.get_name() == "publish_rate") {
+                if (p.as_int() <= 0) {
+                    result.successful = false;
+                    result.reason     = "publish_rate は正の値にしてください";
+                    return result;
+                }
+                // 受理されたらメンバ変数を更新
+                publish_rate_ = p.as_int();
+                timer_->cancel();
+                timer_ = this->create_wall_timer(
+                    std::chrono::milliseconds(1000 / publish_rate_),
+                    std::bind(&ParamNode::timer_callback, this));
+                RCLCPP_INFO(this->get_logger(), "publish_rate 変更 → %d Hz", publish_rate_);
+            }
+            if (p.get_name() == "robot_name") {
+                robot_name_ = p.as_string();
+                RCLCPP_INFO(this->get_logger(), "robot_name 変更 → %s", robot_name_.c_str());
+            }
+        }
+        return result;
+    }
+
+    void timer_callback()
+    {
+        auto msg = std_msgs::msg::String();
+        msg.data = robot_name_ + " is running (" + std::to_string(publish_rate_) + " Hz)";
+        pub_->publish(msg);
+        RCLCPP_INFO(this->get_logger(), "%s", msg.data.c_str());
+    }
+
+    rclcpp::Publisher<std_msgs::msg::String>::SharedPtr pub_;
+    rclcpp::TimerBase::SharedPtr timer_;
+    rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr cb_handle_;
+
+    std::string robot_name_;
+    int         publish_rate_;
+};
+
+int main(int argc, char * argv[])
+{
+    rclcpp::init(argc, argv);
+    rclcpp::spin(std::make_shared<ParamNode>());
+    rclcpp::shutdown();
+    return 0;
+}
+```
+
+### 8章のラムダ版との違い
+
+| | 8章（ラムダ版） | 14章（クラス版）|
+|--|--------------|--------------|
+| コールバックの書き方 | ラムダ式 | メンバ関数（`std::bind`）|
+| メンバ変数への反映 | ループで毎回 `get_parameter` | コールバック内でメンバ変数を直接更新 |
+| タイマーの再生成 | 不可（ループが Rate を毎回作る）| 可能（`timer_->cancel()` + 新規生成）|
+
+ハンドルの型 `rclcpp::node_interfaces::OnSetParametersCallbackHandle::SharedPtr` を**メンバ変数で保持**することが重要です．ローカル変数に置くとスコープを抜けた瞬間にコールバックが解除されてしまいます．
+
+---
+
 [→ 15章: ROS2 総合演習](15_ros2_exercises.md)

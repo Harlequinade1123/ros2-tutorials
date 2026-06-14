@@ -236,7 +236,108 @@ install(DIRECTORY launch config
 
 `ros2 param set` でパラメータを変更しても，**すでに起動しているノードが `declare_parameter` + `get_parameter` のみで読んでいる場合はリアルタイムには反映されません**（起動時の一度だけ読み取り）．
 
-動的変更に対応するには `on_set_parameters_callback` を登録します（このチュートリアルの範囲外）．
+動的変更に対応するには 2 つの工夫が必要です：
+
+1. **ループ内で毎回 `get_parameter` を呼ぶ**（変更後の値を読み直す）
+2. **`add_on_set_parameters_callback` でバリデーションを行う**（不正な値を弾く）
+
+### `add_on_set_parameters_callback`
+
+```cpp
+auto cb_handle = node->add_on_set_parameters_callback(
+    [](const std::vector<rclcpp::Parameter> & params)
+    {
+        rcl_interfaces::msg::SetParametersResult result;
+        result.successful = true;
+        for (const auto & p : params) {
+            if (p.get_name() == "publish_rate" && p.as_int() <= 0) {
+                result.successful = false;
+                result.reason     = "publish_rate は正の値にしてください";
+                return result;
+            }
+        }
+        return result;
+    });
+```
+
+- コールバックは `ros2 param set` が呼ばれるたびに実行される
+- `result.successful = false` を返すと変更が**拒否**され，ノードには反映されない
+- `result.successful = true` を返すと変更が**受理**され，次の `get_parameter` で新しい値が読める
+- 戻り値の型は `rcl_interfaces::msg::SetParametersResult`
+
+### 動的変更に対応した param_example.cpp
+
+```cpp
+#include "rclcpp/rclcpp.hpp"
+#include "std_msgs/msg/string.hpp"
+#include "rcl_interfaces/msg/set_parameters_result.hpp"
+
+int main(int argc, char * argv[])
+{
+    rclcpp::init(argc, argv);
+    auto node = rclcpp::Node::make_shared("param_example");
+
+    node->declare_parameter("robot_name",   std::string("robot_A"));
+    node->declare_parameter("publish_rate", 10);
+    node->declare_parameter("threshold",    0.5);
+
+    // publish_rate に正の値しか受け付けないバリデーション
+    auto cb_handle = node->add_on_set_parameters_callback(
+        [](const std::vector<rclcpp::Parameter> & params)
+        {
+            rcl_interfaces::msg::SetParametersResult result;
+            result.successful = true;
+            for (const auto & p : params) {
+                if (p.get_name() == "publish_rate" && p.as_int() <= 0) {
+                    result.successful = false;
+                    result.reason     = "publish_rate は正の値にしてください";
+                    return result;
+                }
+            }
+            return result;
+        });
+
+    auto pub = node->create_publisher<std_msgs::msg::String>("status", 10);
+
+    while (rclcpp::ok())
+    {
+        // 毎ループ get_parameter で読み直すことで動的変更が反映される
+        std::string robot_name   = node->get_parameter("robot_name").as_string();
+        int         publish_rate = node->get_parameter("publish_rate").as_int();
+
+        auto msg = std_msgs::msg::String();
+        msg.data = robot_name + " is running";
+        pub->publish(msg);
+        RCLCPP_INFO(node->get_logger(), "%s (rate=%d Hz)", msg.data.c_str(), publish_rate);
+
+        rclcpp::spin_some(node);
+        rclcpp::Rate(publish_rate).sleep();
+    }
+
+    rclcpp::shutdown();
+    return 0;
+}
+```
+
+### 動作確認
+
+```bash
+# ターミナル 1: ノードを起動
+ros2 run ros_tutorial param_example
+
+# ターミナル 2: 動的にパラメータを変更
+ros2 param set /param_example robot_name   "new_robot"   # 即座に反映
+ros2 param set /param_example publish_rate 5             # 即座に反映
+ros2 param set /param_example publish_rate 0             # 拒否される
+```
+
+`publish_rate` を 0 に設定しようとすると，ターミナル 2 に次のように表示されて変更が拒否されます：
+
+```
+Setting parameter failed: publish_rate は正の値にしてください
+```
+
+> **クラスを使った書き方**: ラムダの代わりにメンバ関数をコールバックとして渡す書き方は [14章: クラスを使った ROS2 プログラミング](14_ros2_with_class.md) で紹介します．
 
 ---
 
