@@ -105,7 +105,7 @@ ROS2 では，自分で書いたコードを **ワークスペース** という
 ```bash
 mkdir -p ~/ros2_ws/src
 cd ~/ros2_ws
-colcon build
+colcon build --symlink-install
 ```
 
 コマンドを実行すると `build/`・`install/`・`log/` フォルダが生成されます．

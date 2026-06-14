@@ -167,7 +167,7 @@ install(TARGETS class_talker class_listener DESTINATION lib/${PROJECT_NAME})
 ## ビルドと実行
 
 ```bash
-cd ~/ros2_ws && colcon build --packages-select ros_tutorial
+cd ~/ros2_ws && colcon build --symlink-install --packages-select ros_tutorial
 source install/setup.bash
 ```
 

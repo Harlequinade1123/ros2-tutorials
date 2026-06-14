@@ -241,7 +241,7 @@ install(TARGETS
 
 ```bash
 cd ~/ros2_ws
-colcon build --packages-select ros_tutorial
+colcon build --symlink-install --packages-select ros_tutorial
 source install/setup.bash
 ```
 

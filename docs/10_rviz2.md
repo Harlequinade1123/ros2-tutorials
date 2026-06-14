@@ -168,7 +168,7 @@ int main(int argc, char * argv[])
 
 **ターミナル 1（marker_publisher）：**
 ```bash
-cd ~/ros2_ws && colcon build --packages-select ros_tutorial
+cd ~/ros2_ws && colcon build --symlink-install --packages-select ros_tutorial
 source install/setup.bash
 ros2 run ros_tutorial marker_publisher
 ```

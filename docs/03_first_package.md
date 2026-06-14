@@ -114,16 +114,17 @@ ament_package()   # ← 必ず最後に書く
 
 ```bash
 cd ~/ros2_ws
-colcon build
+colcon build --symlink-install
 ```
 
 エラーなく完了すれば成功です．
 
-> **特定のパッケージだけビルドする場合：**
+> **よく使うビルドオプション：**
 > ```bash
-> colcon build --packages-select ros_tutorial
+> colcon build --symlink-install --packages-select ros_tutorial
 > ```
-> ワークスペース全体ではなく，指定したパッケージだけをビルドします．開発中は頻繁に使います．
+> - `--packages-select ros_tutorial` : ワークスペース全体ではなく，指定したパッケージだけをビルドします．開発中は頻繁に使います．
+> - `--symlink-install` : launch ファイル・YAML・Python スクリプトなどの**非コンパイルファイルをコピーではなくシンボリックリンクでインストール**します．これらのファイルを編集したとき，**再ビルドなしで変更が即座に反映**されます（C++ ソースの変更は引き続きリビルドが必要です）．
 
 ---
 
@@ -181,7 +182,7 @@ install(TARGETS hello_node
 
 ```bash
 cd ~/ros2_ws
-colcon build --packages-select ros_tutorial
+colcon build --symlink-install --packages-select ros_tutorial
 source install/setup.bash
 ```
 
@@ -208,7 +209,7 @@ ros2 run ros_tutorial hello_node
 1. ros2 pkg create でパッケージ作成
 2. src/ に .cpp ファイルを書く
 3. CMakeLists.txt に add_executable / ament_target_dependencies / install を追加
-4. colcon build でビルド
+4. colcon build --symlink-install でビルド
 5. source install/setup.bash
 6. ros2 run で実行
 ```

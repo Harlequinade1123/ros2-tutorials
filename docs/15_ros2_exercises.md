@@ -46,7 +46,7 @@ ros2 pkg create ros_exercises --build-type ament_cmake \
 
 ```bash
 cd ~/ros2_ws
-colcon build --packages-select ros_exercises
+colcon build --symlink-install --packages-select ros_exercises
 source install/setup.bash
 ```
 
@@ -211,7 +211,7 @@ install(TARGETS counter_node monitor_node
 ## 個別に動かして確認する
 
 ```bash
-cd ~/ros2_ws && colcon build --packages-select ros_exercises
+cd ~/ros2_ws && colcon build --symlink-install --packages-select ros_exercises
 source install/setup.bash
 ```
 
@@ -274,7 +274,7 @@ install(DIRECTORY launch
 ```
 
 ```bash
-colcon build --packages-select ros_exercises
+colcon build --symlink-install --packages-select ros_exercises
 source install/setup.bash
 ros2 launch ros_exercises monitor_system.launch.py
 ```
@@ -804,7 +804,7 @@ install(DIRECTORY launch config
 #### 動作確認
 
 ```bash
-colcon build --packages-select ros_exercises
+colcon build --symlink-install --packages-select ros_exercises
 source install/setup.bash
 ros2 launch ros_exercises monitor_system.launch.py
 
